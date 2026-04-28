@@ -176,6 +176,20 @@ We welcome contributions to JobShopLab! If you have ideas for improvements or bu
 3. Implement your changes and ensure they are well-documented.
 4. Submit a pull request with a detailed explanation of your modifications.
 
+## Citation
+
+If you use JobShopLab in your research, please cite our paper:
+
+```bibtex
+@inproceedings{hoss2025production,
+  title={A Production Scheduling Framework for Reinforcement Learning Under Real-World Constraints},
+  author={Hoss, Jonathan and Schelling, Felix and Klarmann, Noah},
+  booktitle={2025 IEEE 21st International Conference on Automation Science and Engineering (CASE)},
+  pages={1736--1743},
+  year={2025},
+  organization={IEEE}
+}
+```
 ## Acknowledgment
 
 This work has been supported by the European Union’s Horizon Europe research and innovation programme under the following Chips JU projects. 
