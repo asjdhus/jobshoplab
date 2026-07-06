@@ -18,7 +18,7 @@ from jobshoplab import JobShopLabEnv, load_config
 # 1. 环境工厂函数
 # ============================================
 
-def make_env(config_name="ft10"):
+def make_env(config_name="ft20"):
     """创建环境的工厂函数"""
     def _init():
         # 使用 config_name 而不是 config_path
@@ -54,7 +54,7 @@ class MakespanCallback(BaseCallback):
 # 3. 主训练函数
 # ============================================
 
-def train(config_name="ft10", steps=100000):
+def train(config_name="ft20", steps=100000):
     print("=" * 60)
     print("JobShopLab PPO 训练")
     print(f"配置文件: {config_name}.yaml")
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="JobShopLab PPO 训练")
-    parser.add_argument("--config", type=str, default="ft10",
+    parser.add_argument("--config", type=str, default="ft20",
                         help="配置文件名称 (不含 .yaml)")
     parser.add_argument("--steps", type=int, default=100000,
                         help="训练总步数")
