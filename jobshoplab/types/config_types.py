@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Any
 
 
 @dataclass
@@ -143,3 +143,4 @@ class Config:
     observation_factory: ObservationFactoryConfig = field(default_factory=ObservationFactoryConfig)
     reward_factory: RewardFactoryConfig = field(default_factory=RewardFactoryConfig)
     render_backend: RenderBackendConfig = field(default_factory=RenderBackendConfig)
+    instance_config: dict[str, Any] = field(default_factory=dict)

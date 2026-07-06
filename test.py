@@ -1,6 +1,5 @@
 """
 JobShopLab - PPO 训练脚本
-支持指定配置文件
 """
 
 import sys
@@ -19,18 +18,12 @@ from jobshoplab import JobShopLabEnv, load_config
 # 1. 环境工厂函数
 # ============================================
 
-def make_env(config_name="getting_started_config"):
+def make_env(config_name="ft10"):
     """创建环境的工厂函数"""
     def _init():
-        config_path = Path(f"./data/config/{config_name}.yaml")
-        
-        if not config_path.exists():
-            raise FileNotFoundError(f"配置文件不存在: {config_path}")
-        
-        print(f"📂 加载配置: {config_path}")
-        config = load_config(config_path=config_path)
-        print(f"✅ 配置加载成功!")
-        
+        # 使用 config_name 而不是 config_path
+        config = load_config(config_path=config_name)
+        print(f"✅ 配置加载成功: {config_name}")
         env = JobShopLabEnv(config=config)
         return env
     return _init
@@ -61,19 +54,12 @@ class MakespanCallback(BaseCallback):
 # 3. 主训练函数
 # ============================================
 
-def train(config_name="getting_started_config", steps=100000):
+def train(config_name="ft10", steps=100000):
     print("=" * 60)
     print("JobShopLab PPO 训练")
     print(f"配置文件: {config_name}.yaml")
     print(f"训练步数: {steps}")
     print("=" * 60)
-    
-    config_path = Path(f"./data/config/{config_name}.yaml")
-    if not config_path.exists():
-        print(f"\n❌ 配置文件不存在: {config_path}")
-        return
-    
-    print(f"\n📂 配置文件: {config_path}")
     
     print("🏗️ 创建环境...")
     env = make_vec_env(
@@ -131,7 +117,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="JobShopLab PPO 训练")
-    parser.add_argument("--config", type=str, default="getting_started_config",
+    parser.add_argument("--config", type=str, default="ft10",
                         help="配置文件名称 (不含 .yaml)")
     parser.add_argument("--steps", type=int, default=100000,
                         help="训练总步数")

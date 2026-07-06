@@ -12,7 +12,7 @@ from stable_baselines3 import PPO
 from jobshoplab import JobShopLabEnv, load_config
 
 
-def evaluate(model_path, config_name="getting_started_config", episodes=10):
+def evaluate(model_path, config_name="ft10", episodes=10):
     print("=" * 60)
     print("评估模型")
     print(f"模型: {model_path}")
@@ -71,9 +71,9 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", type=str, 
-                        default="./models/ppo_getting_started_100000steps",
+                        default="./models/ppo_ft10_100000steps",
                         help="模型路径")
-    parser.add_argument("--config", type=str, default="getting_started_config",
+    parser.add_argument("--config", type=str, default="ft10",
                         help="配置文件名称")
     parser.add_argument("--episodes", type=int, default=10,
                         help="评估次数")
