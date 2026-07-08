@@ -1,5 +1,5 @@
 """
-JobShopLab - PPO 训练脚本 (修复版)
+JobShopLab - PPO 训练脚本 
 """
 
 import sys
@@ -115,10 +115,10 @@ def train(config_name="ft20", steps=500000, n_envs=8):
 if __name__ == "__main__":
     import argparse
     
-    parser = argparse.ArgumentParser(description="JobShopLab PPO 训练 (修复版)")
-    parser.add_argument("--config", type=str, default="getting_started_config",
+    parser = argparse.ArgumentParser(description="JobShopLab PPO 训练 ")
+    parser.add_argument("--config", type=str, default="real_world_config",
                         help="配置文件名称")
-    parser.add_argument("--steps", type=int, default=500000,
+    parser.add_argument("--steps", type=int, default=1000000,
                         help="训练总步数")
     parser.add_argument("--n_envs", type=int, default=8,
                         help="并行环境数")
