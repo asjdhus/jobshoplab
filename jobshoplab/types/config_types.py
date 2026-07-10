@@ -62,9 +62,17 @@ class BinaryJobActionFactoryConfig:
 
 
 @dataclass
+class MultiDiscreteActionSpaceFactoryConfig:
+    loglevel: str = "warning"
+
+
+@dataclass
 class ActionFactoryConfig:
     binary_job_action_factory: BinaryJobActionFactoryConfig = field(
         default_factory=BinaryJobActionFactoryConfig
+    )
+    multi_discrete_action_space_factory: MultiDiscreteActionSpaceFactoryConfig = field(
+        default_factory=MultiDiscreteActionSpaceFactoryConfig
     )
 
 
@@ -84,7 +92,7 @@ class ObservationFactoryConfig:
     binary_action_observation_factory: BinaryActionObservationFactoryConfig = field(
         default_factory=BinaryActionObservationFactoryConfig
     )
-    tassel_jsp_observation: TasselJsspObservationConfig = field(
+    tassel_jssp_observation: TasselJsspObservationConfig = field(
         default_factory=TasselJsspObservationConfig
     )
 

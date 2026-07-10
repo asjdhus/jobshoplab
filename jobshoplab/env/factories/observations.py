@@ -712,22 +712,22 @@ class TasselJsspObservation(ObservationFactory):
                     # A Boolean to represent if the job can be allocated
                 ),
                 "left_over_time": gym.spaces.Box(
-                    low=0, high=1, shape=(self.num_jobs,), dtype=np.int8
+                    low=0, high=1, shape=(self.num_jobs,), dtype=np.float32
                 ),  # left-over time for the currently performed operation on the job
                 "percent_finished": gym.spaces.Box(
-                    low=0, high=1, shape=(self.num_jobs,), dtype=np.int8
+                    low=0, high=1, shape=(self.num_jobs,), dtype=np.float32
                 ),  # percentage of operations finished for a job
                 "total_completion": gym.spaces.Box(
-                    low=0, high=1, shape=(self.num_jobs,), dtype=np.int8
+                    low=0, high=1, shape=(self.num_jobs,), dtype=np.float32
                 ),  # left-over time until total completion of the job, scaled by the longest job total completion time
                 "time_until_next_machine_is_free": gym.spaces.Box(
-                    low=0, high=1, shape=(self.num_jobs,), dtype=np.int8
+                    low=0, high=1, shape=(self.num_jobs,), dtype=np.float32
                 ),  # time until the machine needed to perform the next job’s operation is free, scaled by the longest job total completion time
                 "idle_since_last_op": gym.spaces.Box(
-                    low=0, high=1, shape=(self.num_jobs,), dtype=np.int8
+                    low=0, high=1, shape=(self.num_jobs,), dtype=np.float32
                 ),  # IDLE time since last job’s performed operation, scaled by the sum of durations of all operations
                 "cum_idle_time": gym.spaces.Box(
-                    low=0, high=1, shape=(self.num_jobs,), dtype=np.int8
+                    low=0, high=1, shape=(self.num_jobs,), dtype=np.float32
                 ),  # cumulative job’s IDLE time in the schedule
             }
         )

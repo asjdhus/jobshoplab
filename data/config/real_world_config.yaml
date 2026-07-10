@@ -11,24 +11,24 @@ compiler:
     - "DummyManipulator"
 
   dsl_repository:
-    dir: "data/jssp_instances/dsl/real_world_deterministic_6x6_instance.yaml"
+    dir: "data/jssp_instances/transport/ft06.yaml"
 
   spec_repository:
     dir: "data/jssp_instances/spec_files/ft06"
 
 env:
   loglevel: *default_loglevel
-  observation_factory: "BinaryActionObservationFactory"
+  observation_factory: "TasselJsspObservation"
   reward_factory: "BinaryActionJsspReward"
-  action_factory: "BinaryJobActionFactory"
+  action_factory: "MultiDiscreteActionSpaceFactory"
   render_backend: "render_in_dashboard"
   middleware: "EventBasedBinaryActionMiddleware"
-  max_time_fct: 2 # allowed fct for truncation max_time = lower_bound * max_time_fct where 2 is evaluated empirically
-  max_action_fct: 3 # truncation if there is num_actions >   max_action_fct * number of operations 
+  max_time_fct: 2
+  max_action_fct: 3 
 
 state_machine:
   loglevel: *default_loglevel
-  allow_early_transport: false # allow transport of jobs before machine processing is finished
+  allow_early_transport: true # allow transport of jobs before machine processing is finished
 
 middleware:
   event_based_binary_action_middleware:
@@ -37,19 +37,19 @@ middleware:
     truncation_active: false
 
 action_factory:
-  binary_job_action_factory:
+  multi_discrete_action_space_factory:
     loglevel: *default_loglevel
 
 observation_factory:
-  binary_action_observation_factory:
+  tassel_jssp_observation:
     loglevel: *default_loglevel
 
 reward_factory:
   binary_action_jssp_reward:
     loglevel: *default_loglevel
-    sparse_bias: 1 #[0,inf] float
-    dense_bias: 0.001 #[0,inf] float
-    truncation_bias: -1 #[-inf,0] float
+    sparse_bias: 5.0
+    dense_bias: 1.0
+    truncation_bias: -2.0
 
 
 render_backend:

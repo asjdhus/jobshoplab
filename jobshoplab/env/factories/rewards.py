@@ -117,30 +117,31 @@ class BinaryActionJsspReward(RewardFactory):
 
     def _sparse_reward(self, state: StateMachineResult, terminated, truncated) -> float:
         if truncated:
-            return (
-                self.truncation_bias * self._truncation_reward()
-            ) / self.sparse_bias  # devided by sparse bias to make sure not to overlay sparse bias (gets multiplied by sparse bias in make method)
+            return self.truncation_bias
         if not terminated:
             return 0.0
-        # terminated
         if isinstance(state.state.time, NoTime):
             raise InvalidValue("time", state.state.time, "NoTime")
         time = state.state.time.time
-        # makespan based
-        return (self.max_allowed_time - time) / (self.max_allowed_time - self.lower_bound)
+        proximity = (self.max_allowed_time - time) / (self.max_allowed_time - self.lower_bound)
+        bonus = 0.0
+        if time <= 76:
+            bonus = 2.0
+        elif time <= 80:
+            bonus = 1.0
+        elif time <= 83:
+            bonus = 0.5
+        return proximity + bonus
 
     def _dense_reward(self, state: StateMachineResult) -> float:
         self.total_actions += 1
         if len(state.action.transitions) == 0:
             self.no_op_counter += 1
             self.total_no_ops += 1
+            return -1.0 / self.num_operations
         else:
             self.no_op_counter = 0
-        return (
-            -int(self.no_op_counter >= len(self.instance.instance.specification))
-            / self.num_operations
-        )
-        # ) + (int(len(state.action.transitions) == 0) / self.num_operations)
+            return 0.5 / self.num_operations
 
     def make(self, state: StateMachineResult, terminated, truncated) -> float:
         s_reward = self._sparse_reward(state, terminated, truncated)

@@ -178,72 +178,59 @@ class MultiDiscreteActionSpaceFactory(ActionFactory):
         **kwargs,
     ):
         self.num_jobs = len(instance.instance.specification)
-        # action_space = spaces.Discrete(2, start=0)
-        action_space = spaces.MultiDiscrete([2] * self.num_jobs)
+        action_space = spaces.Discrete(self.num_jobs + 1)
         super().__init__(loglevel, config, instance, action_space, *args, **kwargs)
 
     def interpret(
         self,
-        action: tuple[int],
-        state: State,
+        action: int,
+        state: StateMachineResult,
         *args,
         **kwargs,
     ) -> Action:
-        raise NotImplementedError
         if not self.action_space.contains(action):
             raise ActionOutOfActionSpace(action, self.action_space)
 
-        # Map actions to jobs
-        # action 0 is no operation schedule
-        # action 1 is job 0, action 2 is job 1, etc.
+        if action == 0:
+            return Action(
+                transitions=tuple(),
+                action_factory_info=ActionFactoryInfo.NoOperation,
+                time_machine=jump_to_event,
+            )
 
-        transitions = []
-        for job_id_int, action in enumerate(action):
-            if action == 0:
-                continue
+        job_idx = action - 1
+        if job_idx >= self.num_jobs:
+            return Action(
+                transitions=tuple(),
+                action_factory_info=ActionFactoryInfo.NoOperation,
+                time_machine=jump_to_event,
+            )
 
-            elif action == 1:
-                job: JobState = next(
-                    filter(lambda j: get_id_int(j.id) == job_id_int, state.jobs), None
+        target_job = state.state.jobs[job_idx]
+        next_op = job_type_utils.get_next_not_done_operation(target_job)
+        if next_op is None:
+            return Action(
+                transitions=tuple(),
+                action_factory_info=ActionFactoryInfo.NoOperation,
+                time_machine=jump_to_event,
+            )
+
+        for transition in state.possible_transitions:
+            if transition.job_id == target_job.id and transition.new_state in (
+                MachineStateState.SETUP,
+                MachineStateState.WORKING,
+            ):
+                return Action(
+                    transitions=(transition,),
+                    action_factory_info=ActionFactoryInfo.Valid,
+                    time_machine=jump_to_event,
                 )
-                if job is None:
-                    raise InvalidValue("job", job_id_int, "Job not found in state.")
-
-                # TODO: Fails if there are no open operations
-                next_op = job_type_utils.get_next_not_done_operation(job)
-
-                # getting transporter
-                transports = state.transports
-                transporter = filter(
-                    lambda x: get_id_int(x.id) == get_id_int(job.id),
-                    transports,
-                )
-
-                transporter: TransportState | None = next(transporter, None)
-                if transporter is None:
-                    raise InvalidValue(
-                        "transporter", next_op.id, "No Transporter found. this is a bug"
-                    )
-                # make transitions
-                component_teleporter = ComponentTransition(
-                    component_id=transporter.id,
-                    new_state=TransportStateState.WORKING,
-                    job_id=job.id,
-                )
-
-                component_transition = ComponentTransition(
-                    component_id=next_op.machine_id,
-                    new_state=MachineStateState.WORKING,
-                    job_id=job.id,
-                )
-
-                transitions.append(component_teleporter)
-                transitions.append(component_transition)
 
         return Action(
-            transitions=tuple(transitions),
-            action_factory_info=ActionFactoryInfo.Valid,
+            transitions=tuple(),
+            action_factory_info=ActionFactoryInfo.NoOperation,
+            time_machine=jump_to_event,
         )
 
     def __repr__(self) -> str:
-        return f"SimpleJsspActionFactory with action space:{self.action_space}"
+        return f"MultiDiscreteActionSpaceFactory with action space:{self.action_space}"
