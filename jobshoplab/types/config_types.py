@@ -84,7 +84,9 @@ class BinaryActionObservationFactoryConfig:
 @dataclass
 class TasselJsspObservationConfig:
     loglevel: str = "warning"
-
+@dataclass
+class Ft06ObservationConfig:
+    loglevel: str = "warning"
 
 
 @dataclass
@@ -94,6 +96,9 @@ class ObservationFactoryConfig:
     )
     tassel_jssp_observation: TasselJsspObservationConfig = field(
         default_factory=TasselJsspObservationConfig
+    )
+    ft06_observation: Ft06ObservationConfig = field(
+        default_factory=Ft06ObservationConfig
     )
 
 

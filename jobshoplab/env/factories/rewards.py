@@ -123,25 +123,20 @@ class BinaryActionJsspReward(RewardFactory):
         if isinstance(state.state.time, NoTime):
             raise InvalidValue("time", state.state.time, "NoTime")
         time = state.state.time.time
-        proximity = (self.max_allowed_time - time) / (self.max_allowed_time - self.lower_bound)
-        bonus = 0.0
-        if time <= 76:
-            bonus = 2.0
-        elif time <= 80:
-            bonus = 1.0
-        elif time <= 83:
-            bonus = 0.5
-        return proximity + bonus
+        if time <= self.lower_bound:
+            return 20.0
+        reward = 20.0 - (time - self.lower_bound) / 2.0
+        return reward
 
     def _dense_reward(self, state: StateMachineResult) -> float:
         self.total_actions += 1
         if len(state.action.transitions) == 0:
             self.no_op_counter += 1
             self.total_no_ops += 1
-            return -1.0 / self.num_operations
+            return -0.5
         else:
             self.no_op_counter = 0
-            return 0.5 / self.num_operations
+            return 0.5
 
     def make(self, state: StateMachineResult, terminated, truncated) -> float:
         s_reward = self._sparse_reward(state, terminated, truncated)

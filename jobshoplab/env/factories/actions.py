@@ -9,6 +9,7 @@ from jobshoplab.types.action_types import Action, ActionFactoryInfo, ComponentTr
 from jobshoplab.types.state_types import (
     JobState,
     MachineStateState,
+    OperationStateState,
     StateMachineResult,
     TransportState,
     TransportStateState,
@@ -178,7 +179,9 @@ class MultiDiscreteActionSpaceFactory(ActionFactory):
         **kwargs,
     ):
         self.num_jobs = len(instance.instance.specification)
-        action_space = spaces.Discrete(self.num_jobs + 1)
+        self.num_machines = len(instance.machines)
+        self.max_transitions = self.num_jobs + self.num_machines
+        action_space = spaces.Discrete(self.max_transitions + 1)
         super().__init__(loglevel, config, instance, action_space, *args, **kwargs)
 
     def interpret(
@@ -198,37 +201,18 @@ class MultiDiscreteActionSpaceFactory(ActionFactory):
                 time_machine=jump_to_event,
             )
 
-        job_idx = action - 1
-        if job_idx >= self.num_jobs:
+        idx = action - 1
+        if idx >= len(state.possible_transitions):
             return Action(
                 transitions=tuple(),
                 action_factory_info=ActionFactoryInfo.NoOperation,
                 time_machine=jump_to_event,
             )
 
-        target_job = state.state.jobs[job_idx]
-        next_op = job_type_utils.get_next_not_done_operation(target_job)
-        if next_op is None:
-            return Action(
-                transitions=tuple(),
-                action_factory_info=ActionFactoryInfo.NoOperation,
-                time_machine=jump_to_event,
-            )
-
-        for transition in state.possible_transitions:
-            if transition.job_id == target_job.id and transition.new_state in (
-                MachineStateState.SETUP,
-                MachineStateState.WORKING,
-            ):
-                return Action(
-                    transitions=(transition,),
-                    action_factory_info=ActionFactoryInfo.Valid,
-                    time_machine=jump_to_event,
-                )
-
+        transition = state.possible_transitions[idx]
         return Action(
-            transitions=tuple(),
-            action_factory_info=ActionFactoryInfo.NoOperation,
+            transitions=(transition,),
+            action_factory_info=ActionFactoryInfo.Valid,
             time_machine=jump_to_event,
         )
 

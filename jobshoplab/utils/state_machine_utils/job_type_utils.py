@@ -132,7 +132,7 @@ def is_job_running(job: JobState) -> bool:
     )
 
 
-def get_next_not_done_operation(job: JobState) -> OperationState:
+def get_next_not_done_operation(job: JobState):
     """
     Get the next operation from a job.
 
@@ -140,17 +140,14 @@ def get_next_not_done_operation(job: JobState) -> OperationState:
         job (JobState): The job to get the next operation from.
 
     Returns:
-        OperationState: The next operation from the job.
-
-    Raises:
-        InvalidValue: If the job has no more operations.
+        OperationState or None: The next operation from the job, or None if all done.
     """
     operations = job.operations
     next_operation = next(
         filter(lambda op: op.operation_state_state != OperationStateState.DONE, operations), None
     )
     if next_operation is None:
-        raise InvalidValue(job, "job has no more operations. all operations are done.")
+        return None
     return next_operation
 
 

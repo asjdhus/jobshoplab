@@ -11,7 +11,7 @@ sys.path.append(str(Path(__file__).parent))
 import torch
 from stable_baselines3 import PPO
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env import SubprocVecEnv
 from stable_baselines3.common.callbacks import BaseCallback
 
 from jobshoplab import JobShopLabEnv, load_config
@@ -40,7 +40,7 @@ class EntropyDecayCallback(BaseCallback):
 
 class MakespanCallback(BaseCallback):
     def __init__(self, model=None, save_path="./models/best_model",
-                 min_episodes=200, patience=10000, target_makespan=76, verbose=0):
+                 min_episodes=200, patience=5000, target_makespan=76, verbose=0):
         super().__init__(verbose)
         self.model = model
         self.save_path = save_path
@@ -48,6 +48,15 @@ class MakespanCallback(BaseCallback):
         self.patience = patience
         self.target_makespan = target_makespan
         self.best_makespan = float('inf')
+        self._best_record_path = save_path + ".txt"
+        if os.path.exists(self._best_record_path):
+            try:
+                with open(self._best_record_path) as f:
+                    prev = float(f.read().strip())
+                self.best_makespan = prev
+                print(f"[MakespanCallback] 从记录恢复 best_makespan={prev}")
+            except:
+                pass
         self.episode_count = 0
         self._step_counter = 0
         self._done_count = 0
@@ -66,11 +75,10 @@ class MakespanCallback(BaseCallback):
         infos = self.locals.get('infos')
 
         if dones is None:
-            dones = self.locals.get('done')
-            infos = self.locals.get('info')
-
-        if dones is None:
             return True
+
+        if self._step_counter <= 5:
+            print(f"[MakespanCallback] step={self._step_counter} | dones={dones} | type={type(dones)}")
 
         if not hasattr(dones, '__iter__'):
             dones = [dones]
@@ -87,7 +95,7 @@ class MakespanCallback(BaseCallback):
                     truncated = info.get('truncated', False)
                     if self.episode_count <= 5:
                         print(f"[DEBUG] Ep {self.episode_count} | info keys={list(info.keys())} | term={terminated} | trunc={truncated} | ms={makespan}")
-                    if makespan is not None:
+                    if makespan is not None and terminated:
                         print(f"Episode {self.episode_count} | Makespan: {makespan}")
                         if makespan < self.best_makespan:
                             self.best_makespan = makespan
@@ -96,6 +104,8 @@ class MakespanCallback(BaseCallback):
                             if (self.model is not None
                                     and self.episode_count >= self.min_episodes):
                                 self.model.save(self.save_path)
+                                with open(self._best_record_path, 'w') as f:
+                                    f.write(str(makespan))
                                 print(f"    Model saved to: {self.save_path}")
                             if makespan <= self.target_makespan:
                                 print(f"    🎯 达到目标 makespan={self.target_makespan}，停止训练!")
@@ -107,7 +117,7 @@ class MakespanCallback(BaseCallback):
                                     print(f"    ⏹ 连续 {self.patience} 个 episode 无改进 (best={self.best_makespan})，停止训练!")
                                     return False
                     elif truncated:
-                        print(f"Episode {self.episode_count} | TRUNCATED (no makespan)")
+                        print(f"Episode {self.episode_count} | TRUNCATED (ms={makespan})")
                 elif self.episode_count <= 5:
                     print(f"[DEBUG] Ep {self.episode_count} | info type={type(info).__name__} | val={info}")
 
@@ -118,7 +128,7 @@ class MakespanCallback(BaseCallback):
         return True
 
 
-def train(config_name="ft20", steps=5000000, n_envs=8):
+def train(config_name="ft20", steps=5000000, n_envs=4, load_model=None):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"=" * 60)
     print("JobShopLab PPO 训练 (修复版)")
@@ -134,32 +144,39 @@ def train(config_name="ft20", steps=5000000, n_envs=8):
     env = make_vec_env(
         make_env(config_name),
         n_envs=n_envs,
-        vec_env_cls=DummyVecEnv,
+        vec_env_cls=SubprocVecEnv,
         seed=42
     )
     print("✅ 环境创建成功")
     
     # 创建PPO模型
     print("🤖 创建 PPO 模型...")
-    model = PPO(
-        policy="MultiInputPolicy",
-        env=env,
-        verbose=1,
-        device=device,
-        learning_rate=3e-4,
-        n_steps=2048,
-        batch_size=128,
-        n_epochs=10,
-        gamma=0.99,
-        gae_lambda=0.95,
-        clip_range=0.2,
-        ent_coef=1.0,
-        target_kl=0.02,
-        vf_coef=0.5,
-        max_grad_norm=0.5,
-        tensorboard_log="./logs/",
-        policy_kwargs=dict(net_arch=dict(pi=[256, 256], vf=[256, 256]))
-    )
+    if load_model:
+        print(f"📂 加载已有模型: {load_model}")
+        if not load_model.startswith(('./', '/', '../')):
+            load_model = './models/' + load_model
+        if load_model.endswith('.zip'):
+            load_model = load_model[:-4]
+        model = PPO.load(load_model, env=env, device=device)
+    else:
+        model = PPO(
+            policy="MultiInputPolicy",
+            env=env,
+            verbose=1,
+            device=device,
+            learning_rate=3e-4,
+            n_steps=512,
+            batch_size=64,
+            n_epochs=8,
+            gamma=0.995,
+            gae_lambda=0.95,
+            clip_range=0.2,
+            ent_coef=0.05,
+            vf_coef=1.0,
+            max_grad_norm=0.5,
+            tensorboard_log="./logs/",
+            policy_kwargs=dict(net_arch=dict(pi=[256, 256], vf=[256, 256]))
+        )
     
     print(f"📱 模型设备: {model.device}")
     print(f"📱 参数位置: {next(model.policy.parameters()).device}")
@@ -170,12 +187,13 @@ def train(config_name="ft20", steps=5000000, n_envs=8):
     makespan_callback = MakespanCallback(
         model=model,
         save_path=f"./models/best_{config_name}",
+        patience=10000,
         verbose=1
     )
 
     entropy_callback = EntropyDecayCallback(
-        initial_ent_coef=1.0,
-        final_ent_coef=0.02,
+        initial_ent_coef=0.05,
+        final_ent_coef=0.01,
         total_steps=steps,
         verbose=0
     )
@@ -184,7 +202,7 @@ def train(config_name="ft20", steps=5000000, n_envs=8):
         total_timesteps=steps,
         callback=[makespan_callback, entropy_callback],
         progress_bar=True,
-        log_interval=1
+        log_interval=10
     )
     
     os.makedirs("./models", exist_ok=True)
@@ -205,11 +223,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="JobShopLab PPO 训练 ")
     parser.add_argument("--config", type=str, default="real_world_config",
                         help="配置文件名称")
-    parser.add_argument("--steps", type=int, default=5000000,
+    parser.add_argument("--steps", type=int, default=10000000,
                         help="训练总步数")
-    parser.add_argument("--n_envs", type=int, default=1,
+    parser.add_argument("--n_envs", type=int, default=4,
                         help="并行环境数")
+    
+    parser.add_argument("--load-model", type=str, default="ppo_real_world_config_10000000steps_gpu_fixed",
+                        help="加载已有模型路径继续训练")
     
     args = parser.parse_args()
     
-    train(args.config, args.steps, args.n_envs)
+    train(args.config, args.steps, args.n_envs, args.load_model)

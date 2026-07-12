@@ -304,7 +304,7 @@ class JobShopLabEnv(gym.Env):
         observation_factory (observations.ObservationFactory | None): ActionFactory for creating observations. Defaults to None.
         reward_factory (rewards.RewardFactory | None): ActionFactory for calculating rewards. Defaults to None.
         middleware (middleware_collection.Middleware | None): Middleware for state transitions. Defaults to None.
-        action_factory (action_factory_collection.ActionFactory | None): ActionFactory for actions. Defaults to None.
+        action_factory (actions.ActionFactory | None): ActionFactory for actions. Defaults to None.
         render_backend (Callable | None): Function for rendering the environment. Defaults to None.
         loglevel (int | str | None): Logging level. Defaults to None.
 
@@ -406,7 +406,7 @@ class JobShopLabEnv(gym.Env):
             "no_op": len(self.history[-1].action.transitions) == 0,
             "terminated": self.terminated,
             "truncated": self.truncated,
-            "makespan": self.state.state.time.time if self.terminated else None,
+            "makespan": self.state.state.time.time,
             "no_op_count": sum([int(len(h.action.transitions) == 0) for h in self.history]),
         }
 

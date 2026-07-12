@@ -387,10 +387,13 @@ class DashboardDataMapper:
             The latest time value from operations.
         """
         return max(
-            op.end_time.time
-            for job in last_state.jobs
-            for op in job.operations
-            if op.end_time != NoTime()
+            (
+                op.end_time.time
+                for job in last_state.jobs
+                for op in job.operations
+                if op.end_time != NoTime()
+            ),
+            default=0,
         )
 
     @staticmethod

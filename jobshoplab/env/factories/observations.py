@@ -12,9 +12,12 @@ from jobshoplab.types.state_types import (
     JobState,
     MachineState,
     MachineStateState,
+    NoTime,
     OperationState,
     OperationStateState,
     StateMachineResult,
+    TransportState,
+    TransportStateState,
 )
 from jobshoplab.utils.exceptions import InvalidValue
 from jobshoplab.utils.logger import get_logger
@@ -628,6 +631,187 @@ class OperationArrayObservation(ObservationFactory):
         return f"OperationArrayObservation with observation_space {self.observation_space}"
 
 
+class Ft06Observation(ObservationFactory):
+    def __init__(self, loglevel: int, config: Config, instance: InstanceConfig, *args, **kwargs):
+        super().__init__(loglevel, config, instance)
+
+        self.num_jobs = len(instance.instance.specification)
+        self.num_machines = len(instance.machines)
+        self.num_transports = len(instance.transports)
+        self.max_allowed_time = get_max_allowed_time(instance)
+        self.instance = instance
+        self.total_duration = sum(
+            op.duration.time
+            for job in instance.instance.specification
+            for op in job.operations
+        )
+        self.max_possible_transitions = self.num_jobs + self.num_machines
+
+        self.spaces = OrderedDict({
+            "allocatable": gym.spaces.MultiBinary(self.num_jobs),
+            "left_over_time": gym.spaces.Box(low=0, high=1, shape=(self.num_jobs,), dtype=np.float32),
+            "percent_finished": gym.spaces.Box(low=0, high=1, shape=(self.num_jobs,), dtype=np.float32),
+            "total_completion": gym.spaces.Box(low=0, high=1, shape=(self.num_jobs,), dtype=np.float32),
+            "time_until_next_machine_free": gym.spaces.Box(low=0, high=1, shape=(self.num_jobs,), dtype=np.float32),
+            "idle_since_last_op": gym.spaces.Box(low=0, high=1, shape=(self.num_jobs,), dtype=np.float32),
+            "cum_idle_time": gym.spaces.Box(low=0, high=1, shape=(self.num_jobs,), dtype=np.float32),
+            "machine_state": gym.spaces.Box(low=0, high=1, shape=(self.num_machines,), dtype=np.float32),
+            "machine_remaining": gym.spaces.Box(low=0, high=1, shape=(self.num_machines,), dtype=np.float32),
+            "machine_queue": gym.spaces.Box(low=0, high=1, shape=(self.num_machines,), dtype=np.float32),
+            "transport_state": gym.spaces.Box(low=0, high=1, shape=(self.num_transports,), dtype=np.float32),
+            "transport_remaining": gym.spaces.Box(low=0, high=1, shape=(self.num_transports,), dtype=np.float32),
+            "action_mask": gym.spaces.MultiBinary(self.max_possible_transitions + 1),
+        })
+        self.observation_space = gym.spaces.Dict(self.spaces)
+
+    def make(self, state_result: StateMachineResult, done: bool) -> dict:
+        state = state_result.state
+        mask = self._calc_action_mask(state_result)
+        return {
+            "allocatable": self._calc_allocatable(state),
+            "left_over_time": self._calc_left_over_times(state),
+            "percent_finished": self._calc_percent_finished(state),
+            "total_completion": self._calc_total_completion(state),
+            "time_until_next_machine_free": self._calc_time_until_next_machine_free(state),
+            "idle_since_last_op": self._calc_idle_since_last_op(state),
+            "cum_idle_time": self._calc_cum_idle_time(state),
+            "machine_state": self._calc_machine_state(state),
+            "machine_remaining": self._calc_machine_remaining(state),
+            "machine_queue": self._calc_machine_queue(state),
+            "transport_state": self._calc_transport_state(state),
+            "transport_remaining": self._calc_transport_remaining(state),
+            "action_mask": mask,
+        }
+
+    def _calc_action_mask(self, state_result: StateMachineResult) -> np.ndarray:
+        mask = np.zeros(self.max_possible_transitions + 1, dtype=np.int8)
+        mask[0] = 1
+        n = min(len(state_result.possible_transitions), self.max_possible_transitions)
+        mask[1:1+n] = 1
+        return mask
+
+    def _calc_allocatable(self, state: State) -> np.ndarray:
+        return np.array([
+            1 if any(op.operation_state_state == OperationStateState.IDLE for op in job.operations)
+               and not any(op.operation_state_state == OperationStateState.PROCESSING for op in job.operations)
+            else 0
+            for job in state.jobs
+        ], dtype=np.float32)
+
+    def _calc_left_over_times(self, state: State) -> np.ndarray:
+        result = np.zeros(self.num_jobs, dtype=np.float32)
+        for i, job in enumerate(state.jobs):
+            for op in job.operations:
+                if op.operation_state_state == OperationStateState.PROCESSING:
+                    result[i] = (op.end_time.time - state.time.time) / self.max_allowed_time
+                    break
+        return result
+
+    def _calc_percent_finished(self, state: State) -> np.ndarray:
+        return np.array([
+            sum(1 for op in job.operations if op.operation_state_state == OperationStateState.DONE)
+            / max(len(job.operations), 1)
+            for job in state.jobs
+        ], dtype=np.float32)
+
+    def _calc_total_completion(self, state: State) -> np.ndarray:
+        result = np.zeros(self.num_jobs, dtype=np.float32)
+        for i, job in enumerate(state.jobs):
+            remaining = 0.0
+            for op in job.operations:
+                if op.operation_state_state == OperationStateState.PROCESSING:
+                    remaining += op.end_time.time - state.time.time
+                elif op.operation_state_state == OperationStateState.IDLE:
+                    op_config = next(
+                        o for o in self.instance.instance.specification[get_id_int(job.id)].operations
+                        if o.id == op.id
+                    )
+                    remaining += op_config.duration.time
+            result[i] = remaining / self.max_allowed_time
+        return result
+
+    def _calc_time_until_next_machine_free(self, state: State) -> np.ndarray:
+        result = np.zeros(self.num_jobs, dtype=np.float32)
+        for i, job in enumerate(state.jobs):
+            next_op = next((op for op in job.operations
+                           if op.operation_state_state == OperationStateState.IDLE), None)
+            if next_op is None:
+                continue
+            machine_id = next_op.machine_id
+            for m in state.machines:
+                if m.id == machine_id:
+                    if isinstance(m.occupied_till, NoTime):
+                        result[i] = 0
+                    else:
+                        wait = max(0, m.occupied_till.time - state.time.time)
+                        result[i] = wait / self.max_allowed_time
+                    break
+        return result
+
+    def _calc_idle_since_last_op(self, state: State) -> np.ndarray:
+        result = np.zeros(self.num_jobs, dtype=np.float32)
+        for i, job in enumerate(state.jobs):
+            last_done_time = 0.0
+            for op in job.operations:
+                if op.operation_state_state == OperationStateState.DONE:
+                    if not isinstance(op.end_time, NoTime):
+                        last_done_time = max(last_done_time, op.end_time.time)
+            if last_done_time > 0:
+                result[i] = (state.time.time - last_done_time) / self.total_duration
+        return result
+
+    def _calc_cum_idle_time(self, state: State) -> np.ndarray:
+        result = np.zeros(self.num_jobs, dtype=np.float32)
+        for i, job in enumerate(state.jobs):
+            idle = 0.0
+            prev_end = 0.0
+            for op in job.operations:
+                if op.operation_state_state == OperationStateState.DONE:
+                    if not isinstance(op.start_time, NoTime):
+                        idle += op.start_time.time - prev_end
+                    if not isinstance(op.end_time, NoTime):
+                        prev_end = op.end_time.time
+                    else:
+                        prev_end = op.start_time.time
+            if prev_end > 0:
+                idle += state.time.time - prev_end
+            result[i] = idle / self.total_duration
+        return result
+
+    def _calc_machine_state(self, state: State) -> np.ndarray:
+        state_map = {MachineStateState.IDLE: 0.0, MachineStateState.SETUP: 0.33,
+                     MachineStateState.WORKING: 0.66, MachineStateState.OUTAGE: 1.0}
+        return np.array([state_map.get(m.state, 0.0) for m in state.machines], dtype=np.float32)
+
+    def _calc_machine_remaining(self, state: State) -> np.ndarray:
+        return np.array([
+            0.0 if isinstance(m.occupied_till, NoTime)
+            else max(0.0, (m.occupied_till.time - state.time.time) / self.max_allowed_time)
+            for m in state.machines
+        ], dtype=np.float32)
+
+    def _calc_machine_queue(self, state: State) -> np.ndarray:
+        max_queue = max(len(m.prebuffer.store) + len(m.buffer.store) for m in state.machines) or 1
+        return np.array([
+            (len(m.prebuffer.store) + len(m.buffer.store)) / max_queue
+            for m in state.machines
+        ], dtype=np.float32)
+
+    def _calc_transport_state(self, state: State) -> np.ndarray:
+        state_map = {TransportStateState.IDLE: 0.0, TransportStateState.WORKING: 0.25,
+                     TransportStateState.PICKUP: 0.5, TransportStateState.TRANSIT: 0.75,
+                     TransportStateState.OUTAGE: 1.0, TransportStateState.WAITINGPICKUP: 0.25}
+        return np.array([state_map.get(t.state, 0.0) for t in state.transports], dtype=np.float32)
+
+    def _calc_transport_remaining(self, state: State) -> np.ndarray:
+        return np.array([
+            0.0 if isinstance(t.occupied_till, NoTime)
+            else max(0.0, (t.occupied_till.time - state.time.time) / self.max_allowed_time)
+            for t in state.transports
+        ], dtype=np.float32)
+
+    def __repr__(self) -> str:
+        return f"Ft06Observation(jobs={self.num_jobs}, machines={self.num_machines}, transports={self.num_transports})"
 class BinaryOperationArrayObservation(OperationArrayObservation):
     def __init__(
         self,

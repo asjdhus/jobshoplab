@@ -1,7 +1,7 @@
 title : Dev Environment
 
 
-default_loglevel: &default_loglevel "warning" # global loglevel add loglevel to each module to overwrite for spec module
+default_loglevel: &default_loglevel "error" # global loglevel add loglevel to each module to overwrite for spec module
 compiler:
   loglevel: *default_loglevel
   repo: "DslRepository"
@@ -18,7 +18,7 @@ compiler:
 
 env:
   loglevel: *default_loglevel
-  observation_factory: "TasselJsspObservation"
+  observation_factory: "Ft06Observation"
   reward_factory: "BinaryActionJsspReward"
   action_factory: "MultiDiscreteActionSpaceFactory"
   render_backend: "render_in_dashboard"
@@ -33,21 +33,21 @@ state_machine:
 middleware:
   event_based_binary_action_middleware:
     loglevel: *default_loglevel
-    truncation_joker: 5
-    truncation_active: false
+    truncation_joker: 500
+    truncation_active: true
 
 action_factory:
   multi_discrete_action_space_factory:
     loglevel: *default_loglevel
 
 observation_factory:
-  tassel_jssp_observation:
+  ft06_observation:
     loglevel: *default_loglevel
 
 reward_factory:
   binary_action_jssp_reward:
     loglevel: *default_loglevel
-    sparse_bias: 5.0
+    sparse_bias: 10.0
     dense_bias: 1.0
     truncation_bias: -2.0
 

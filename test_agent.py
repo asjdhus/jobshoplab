@@ -258,7 +258,7 @@ if __name__ == "__main__":
     
     # 模型参数
     parser.add_argument("--model", type=str, 
-                        default="./models/ppo_real_world_config_1000000steps_opt",
+                        default="./models/ppo_real_world_config_10000000steps_gpu_fixed",
                         help="模型路径")
     
     # 配置参数
