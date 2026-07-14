@@ -268,7 +268,7 @@ if __name__ == "__main__":
                         help="对比模式下的多个配置名称")
     
     # 运行参数
-    parser.add_argument("--episodes", type=int, default=10,
+    parser.add_argument("--episodes", type=int, default=1,
                         help="运行次数")
     parser.add_argument("--no-render", action="store_true",
                         help="不渲染甘特图")

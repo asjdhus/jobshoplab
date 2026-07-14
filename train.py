@@ -48,6 +48,7 @@ class MakespanCallback(BaseCallback):
         self.patience = patience
         self.target_makespan = target_makespan
         self.best_makespan = float('inf')
+        # 读取已有记录，恢复 best_makespan
         self._best_record_path = save_path + ".txt"
         if os.path.exists(self._best_record_path):
             try:
@@ -57,6 +58,9 @@ class MakespanCallback(BaseCallback):
                 print(f"[MakespanCallback] 从记录恢复 best_makespan={prev}")
             except:
                 pass
+        # 如果没有记录但模型文件存在，读取 best_makespan 从文件内容（默认 inf）
+        elif os.path.exists(save_path + ".zip"):
+            print(f"[MakespanCallback] best model文件已存在，但无记录文件，不覆盖直到找到更好结果")
         self.episode_count = 0
         self._step_counter = 0
         self._done_count = 0
@@ -207,12 +211,22 @@ def train(config_name="ft20", steps=5000000, n_envs=4, load_model=None):
     
     os.makedirs("./models", exist_ok=True)
     model_path = f"./models/ppo_{config_name}_{steps}steps_gpu_fixed"
-    model.save(model_path)
-    
-    print("\n" + "=" * 60)
-    print(f"✅ 训练完成!")
-    print(f"💾 模型已保存: {model_path}")
-    print("=" * 60)
+    final_record = model_path + ".txt"
+    prev_best = float('inf')
+    if os.path.exists(final_record):
+        try:
+            with open(final_record) as f:
+                prev_best = float(f.read().strip())
+        except:
+            pass
+    if makespan_callback.best_makespan < prev_best:
+        model.save(model_path)
+        with open(final_record, 'w') as f:
+            f.write(str(makespan_callback.best_makespan))
+        print(f"💾 模型已保存: {model_path}")
+    else:
+        print(f"⏭ 最终模型未覆盖 (best={makespan_callback.best_makespan} >= prev={prev_best})")
+        print("=" * 60)
     
     return model
 
